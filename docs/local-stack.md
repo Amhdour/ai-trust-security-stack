@@ -3,6 +3,7 @@
 This stack is **development-focused** and intentionally minimal. It is not production hardened.
 
 ## Services
+- postgres (Langfuse backing database)
 - keycloak
 - vault (dev mode)
 - qdrant
@@ -55,4 +56,5 @@ docker compose --env-file compose/.env -f compose/docker-compose.yml down -v
 ## Notes
 - Secrets are provided via environment variables and placeholders only.
 - `vault` is configured in `-dev` mode for local development.
-- Langfuse uses a placeholder database URL and may require additional backing services for full functionality.
+- Langfuse uses the local `db` PostgreSQL service by default.
+- Superset loads its local config from `compose/superset/superset_config.py`.

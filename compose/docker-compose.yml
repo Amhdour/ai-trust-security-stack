@@ -1,4 +1,20 @@
 services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${LANGFUSE_POSTGRES_DB:-langfuse}
+      POSTGRES_USER: ${LANGFUSE_POSTGRES_USER:-langfuse}
+      POSTGRES_PASSWORD: ${LANGFUSE_POSTGRES_PASSWORD:-langfuse}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${LANGFUSE_POSTGRES_USER:-langfuse} -d ${LANGFUSE_POSTGRES_DB:-langfuse}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - langfuse_postgres_data:/var/lib/postgresql/data
+    networks:
+      - trust_stack
+
   keycloak:
     image: quay.io/keycloak/keycloak:26.2
     command: ["start-dev"]
@@ -44,8 +60,20 @@ services:
       NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET}
       SALT: ${LANGFUSE_SALT}
       NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3000}
+      LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-}
+      LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_NAME:-}
+      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-}
+      LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_NAME:-}
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_INIT_PROJECT_PUBLIC_KEY:-}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_INIT_PROJECT_SECRET_KEY:-}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-}
+      LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER_NAME:-}
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-}
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
-      - "127.0.0.1:3000:3000"
+      - "3000:3000"
     networks:
       - trust_stack
 
@@ -59,6 +87,8 @@ services:
       - "127.0.0.1:3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
       - trust_stack
 
@@ -71,7 +101,8 @@ services:
       - "127.0.0.1:8088:8088"
     volumes:
       - superset_home:/app/superset_home
-    command: ["/bin/sh", "-c", "superset db upgrade && superset fab create-admin --username ${SUPERSET_ADMIN_USER:-admin} --firstname Dev --lastname Admin --email dev@example.com --password ${SUPERSET_ADMIN_PASSWORD} && superset init && superset run -h 0.0.0.0 -p 8088"]
+      - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+    command: ["/bin/sh", "-c", "superset db upgrade && (superset fab create-admin --username ${SUPERSET_ADMIN_USER:-admin} --firstname Dev --lastname Admin --email dev@example.com --password ${SUPERSET_ADMIN_PASSWORD} || true) && superset init && superset run -h 0.0.0.0 -p 8088"]
     networks:
       - trust_stack
 
@@ -80,6 +111,7 @@ networks:
     name: trust_stack
 
 volumes:
+  langfuse_postgres_data:
   keycloak_data:
   vault_data:
   qdrant_data:

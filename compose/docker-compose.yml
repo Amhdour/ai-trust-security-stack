@@ -55,6 +55,7 @@ services:
 
   langfuse:
     image: langfuse/langfuse:2
+    restart: unless-stopped
     environment:
       DATABASE_URL: ${LANGFUSE_DATABASE_URL:-postgresql://langfuse:langfuse@db:5432/langfuse}
       NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET}
@@ -72,6 +73,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
+        restart: true
     ports:
       - "3000:3000"
     networks:

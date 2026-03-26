@@ -1,5 +1,9 @@
 {
     "git.ignoreLimitWarning": true,
+    "git.autoRepositoryDetection": false,
+    "git.scanRepositories": [
+        "."
+    ],
     "git.ignoredRepositories": [
         "upstream/envoy",
         "upstream/grafana",

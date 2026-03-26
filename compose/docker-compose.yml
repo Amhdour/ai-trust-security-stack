@@ -1,4 +1,27 @@
 services:
+  control_plane:
+    image: python:3.12-slim
+    working_dir: /workspace
+    command: ["python", "-m", "backend.api_gateway.server"]
+    environment:
+      CONTROL_PLANE_REPO_ROOT: /workspace
+      CONTROL_PLANE_HOST: 0.0.0.0
+      CONTROL_PLANE_PORT: 3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ..:/workspace:ro
+    depends_on:
+      - keycloak
+      - qdrant
+      - langfuse
+      - grafana
+      - superset
+      - opa
+      - envoy
+    networks:
+      - trust_stack
+
   db:
     image: postgres:16
     environment:
@@ -75,7 +98,7 @@ services:
         condition: service_healthy
         restart: true
     ports:
-      - "3000:3000"
+      - "3002:3000"
     networks:
       - trust_stack
 
@@ -105,6 +128,29 @@ services:
       - superset_home:/app/superset_home
       - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
     command: ["/bin/sh", "-c", "superset db upgrade && (superset fab create-admin --username ${SUPERSET_ADMIN_USER:-admin} --firstname Dev --lastname Admin --email dev@example.com --password ${SUPERSET_ADMIN_PASSWORD} || true) && superset init && superset run -h 0.0.0.0 -p 8088"]
+    networks:
+      - trust_stack
+
+  opa:
+    image: openpolicyagent/opa:0.70.0
+    command: ["run", "--server", "--addr=0.0.0.0:8181", "/policies/policy.rego"]
+    volumes:
+      - ./opa/policy.rego:/policies/policy.rego:ro
+    ports:
+      - "127.0.0.1:8181:8181"
+    networks:
+      - trust_stack
+
+  envoy:
+    image: envoyproxy/envoy:v1.31-latest
+    command: ["envoy", "-c", "/etc/envoy/envoy.local.yaml", "-l", "info"]
+    volumes:
+      - ./envoy/envoy.local.yaml:/etc/envoy/envoy.local.yaml:ro
+    ports:
+      - "10000:10000"
+      - "9901:9901"
+    depends_on:
+      - opa
     networks:
       - trust_stack
 

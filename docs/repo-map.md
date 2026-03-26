@@ -5,6 +5,12 @@ This document describes the umbrella repository layout for the AI Trust & Securi
 
 ## Top-level directories
 - `.devcontainer/` — Codespaces and local dev environment definitions.
+- `frontend/` — Dashboard-first control-plane UI.
+- `backend/` — API gateway and posture/evidence aggregation services.
+- `contracts/` — Dashboard and control-plane JSON schemas.
+- `apps/` — Logical runtime and governance module grouping.
+- `infra/` — Logical infrastructure grouping for identity, policy, retrieval, telemetry, and evidence systems.
+- `evidence/` — Dashboard-owned evidence export area.
 - `compose/` — Container composition and environment overlays.
 - `docs/` — Architecture, boundaries, and operational documentation.
 - `scripts/` — Validation/bootstrap helper scripts.
@@ -17,4 +23,4 @@ This document describes the umbrella repository layout for the AI Trust & Securi
 
 ## Notes
 - `upstream/*` is treated as third-party and should remain unchanged unless strictly necessary.
-- New implementation should be additive in umbrella-owned folders.
+- New implementation should be additive in umbrella-owned folders, with the dashboard homepage treated as the primary product surface.

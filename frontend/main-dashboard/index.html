@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Trust & Security Control Plane</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <p class="eyebrow">Dashboard-first control plane</p>
+        <h1>Trust &amp; Security Operations Dashboard for RAG and Autonomous Agents</h1>
+        <p class="hero-copy">
+          The dashboard is the front door. Identity, runtime governance, telemetry, and evidence drill-down modules sit behind it.
+        </p>
+        <div class="hero-meta" id="hero-meta"></div>
+        <div class="hero-steps" id="hero-steps"></div>
+      </header>
+
+      <nav class="tab-strip" id="tab-strip" aria-label="Dashboard tabs"></nav>
+
+      <main id="dashboard-root" class="dashboard-root" aria-live="polite">
+        <section class="loading-panel">
+          <p class="eyebrow">Loading</p>
+          <h2>Assembling control-plane posture</h2>
+          <p>Pulling security posture, runtime, and evidence summaries from local stack artifacts.</p>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div>
+          <p class="eyebrow">Control-plane sources</p>
+          <div id="sources" class="source-grid"></div>
+        </div>
+      </footer>
+    </div>
+
+    <noscript>This dashboard needs JavaScript enabled to render live posture sections.</noscript>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

@@ -1,3 +1,19 @@
 {
-    "git.ignoreLimitWarning": true
+    "git.ignoreLimitWarning": true,
+    "git.ignoredRepositories": [
+        "upstream/envoy",
+        "upstream/grafana",
+        "upstream/gvisor",
+        "upstream/keycloak",
+        "upstream/keycloak-quickstarts",
+        "upstream/langfuse",
+        "upstream/langfuse-python",
+        "upstream/onyx",
+        "upstream/opa",
+        "upstream/opa-envoy-plugin",
+        "upstream/qdrant",
+        "upstream/superset",
+        "upstream/vault",
+        "overlays/myStarterKit"
+    ]
 }

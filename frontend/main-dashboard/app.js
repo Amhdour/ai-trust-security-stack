@@ -12,10 +12,10 @@ let liveLogTimer = 0;
 let lastDashboardPayload = null;
 
 const LANDING_STEPS = [
-  "Dashboard main page",
-  "Identity and session",
-  "Governed AI runtime",
-  "Evidence and analytics",
+  "Business overview",
+  "User access",
+  "AI operations",
+  "Evidence and reports",
 ];
 
 function escapeHtml(value) {
@@ -97,7 +97,7 @@ function renderResetState() {
       <section class="loading-panel">
         <p class="eyebrow">Reset</p>
         <h3>Live log cleared</h3>
-        <p>No telemetry entries are currently shown.</p>
+        <p>No recent activity is currently shown.</p>
       </section>
     `;
   }
@@ -107,7 +107,7 @@ function renderResetState() {
       <section class="loading-panel">
         <p class="eyebrow">Reset</p>
         <h2>Dashboard data cleared</h2>
-        <p>Operational stats were removed, but URL entry points and source links remain available below.</p>
+        <p>Business metrics were removed, but useful links and source URLs remain available below.</p>
       </section>
       ${linkSections
         .map(
@@ -306,10 +306,10 @@ function renderLiveLog(payload) {
       <div class="hero-meta">
         <span class="chip">Auto-refresh ${intervalSeconds}s</span>
         <span class="chip">Last updated ${escapeHtml(refreshedAt)}</span>
-        <span class="chip">${escapeHtml(String(entries.length))} events</span>
+        <span class="chip">${escapeHtml(String(entries.length))} recent items</span>
       </div>
       <a class="live-log-source" href="${escapeHtml(payload.source_href || "/raw/telemetry/exports/sample_events.jsonl")}" target="_blank" rel="noreferrer">
-        Open raw feed
+        Open activity feed
       </a>
     </div>
     <div class="live-log-list">
@@ -321,6 +321,11 @@ function renderLiveLog(payload) {
                   <article class="live-log-entry">
                     <div class="live-log-entry-head">
                       <div class="live-log-title-row">
+                        ${
+                          entry.source_label
+                            ? `<span class="live-log-meta-chip">${escapeHtml(entry.source_label)}</span>`
+                            : ""
+                        }
                         <span class="${statusClass(entry.status)}">${escapeHtml(entry.severity || "info")}</span>
                         <h3>${escapeHtml(entry.event_type || "event")}</h3>
                       </div>
@@ -350,8 +355,8 @@ function renderLiveLog(payload) {
               .join("")
           : `
             <article class="live-log-entry live-log-empty">
-              <h3>No events yet</h3>
-              <p class="live-log-summary">Telemetry entries will appear here as the local event feed grows.</p>
+              <h3>No recent activity yet</h3>
+              <p class="live-log-summary">New requests, alerts, and operating events will appear here.</p>
             </article>
           `
       }
@@ -367,7 +372,7 @@ function renderLiveLogError(error) {
   liveLogRoot.innerHTML = `
     <section class="loading-panel">
       <p class="eyebrow">Unavailable</p>
-      <h3>Live log could not load</h3>
+      <h3>Recent activity could not load</h3>
       <p>${escapeHtml(error.message || "Unknown error")}</p>
     </section>
   `;
@@ -411,7 +416,7 @@ async function boot() {
     root.innerHTML = `
       <section class="loading-panel">
         <p class="eyebrow">Unavailable</p>
-        <h2>Control-plane dashboard could not load</h2>
+        <h2>Dashboard could not load</h2>
         <p>${escapeHtml(error.message || "Unknown error")}</p>
       </section>
     `;

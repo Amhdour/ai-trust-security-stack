@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from backend.activity_service.service import build_activity_snapshot
 from backend.evidence_service.service import build_evidence_pack_summary
 from backend.integration_adapter.repository import (
     load_eval_summaries,
@@ -110,27 +111,7 @@ def _summarize_event(event: dict[str, Any]) -> str:
 
 def build_control_plane_live_log(root: Path | None = None, limit: int = 12) -> dict[str, Any]:
     resolved_root = repo_root(root)
-    events = load_sample_events(resolved_root)
-    recent_events = list(reversed(events[-limit:]))
-
-    return {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "poll_interval_ms": 5000,
-        "source_href": _raw("telemetry/exports/sample_events.jsonl"),
-        "entries": [
-            {
-                "event_type": str(event.get("event_type", "event")),
-                "timestamp": str(event.get("timestamp", "")),
-                "severity": str(event.get("severity", "info")),
-                "status": _severity_status(str(event.get("severity", "info"))),
-                "request_id": str(event.get("request_id", "")),
-                "trace_id": str(event.get("trace_id", "")),
-                "tenant_id": str(event.get("tenant_id", "")),
-                "summary": _summarize_event(event),
-            }
-            for event in recent_events
-        ],
-    }
+    return build_activity_snapshot(resolved_root, limit=limit)
 
 
 def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
@@ -144,6 +125,7 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     launch_summary = build_launch_gate_summary(resolved_root)
     eval_summaries = load_eval_summaries(resolved_root)
     latest_eval = _latest(eval_summaries)
+    activity_snapshot = build_activity_snapshot(resolved_root, limit=12)
 
     request_events = [event for event in events if event.get("event_type") == "request.start"]
     policy_events = [event for event in events if event.get("event_type") == "policy.decision"]
@@ -237,48 +219,48 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
     sections = [
         {
             "id": "overview",
-            "title": "Global Security Posture",
-            "description": "Topline platform health across control, runtime, and evidence planes.",
+            "title": "Business Overview",
+            "description": "A simple summary of platform health, controls, and launch readiness.",
             "blocks": [
                 {
                     "type": "cards",
-                    "title": "Top cards",
+                    "title": "Key business signals",
                     "items": [
                         _card(
-                            "System status",
-                            "Control tower live",
+                            "Overall platform",
+                            "Platform running",
                             "healthy",
                             f"{len(services)} services inventoried across the local stack.",
                         ),
                         _card(
-                            "Policy engine status",
-                            "OPA connected" if "opa" in services else "OPA pending",
+                            "Policy checks",
+                            "Rules active" if "opa" in services else "Rules pending",
                             "healthy" if "opa" in services else "warning",
                             f"{len(allowed_integrations)} governed integrations in policy inventory.",
                         ),
                         _card(
-                            "Identity status",
-                            "Keycloak fronting sessions" if "keycloak" in services else "Identity adapter only",
+                            "User access",
+                            "Access controls active" if "keycloak" in services else "Access setup pending",
                             "healthy" if "keycloak" in services else "warning",
-                            "Dashboard-first flow starts with identity and session context.",
+                            "Business access starts with identity and session controls.",
                         ),
                         _card(
-                            "Retrieval backend status",
-                            "Qdrant posture loaded" if "qdrant" in services else "Retrieval inventory only",
+                            "Company data access",
+                            "Data access active" if "qdrant" in services else "Data inventory only",
                             "healthy" if "qdrant" in services else "warning",
                             f"{sum(len(sources) for sources in allowed_sources.values())} source boundaries are modeled.",
                         ),
                         _card(
-                            "Telemetry pipeline status",
-                            "Langfuse + Grafana + Superset",
+                            "Monitoring",
+                            "Monitoring active",
                             "healthy" if {"langfuse", "grafana", "superset"}.issubset(set(services)) else "warning",
-                            f"{len(events)} sample telemetry events are available for dashboard aggregation.",
+                            f"{len(events)} recent events are available for dashboard reporting.",
                         ),
                         _card(
-                            "Launch-gate status",
+                            "Launch readiness",
                             readiness_status.upper(),
                             _status_from_launch(readiness_status),
-                            f"Readiness score {launch_summary['readiness_score']} with {launch_summary['control_coverage']} controls fully passing.",
+                            f"Readiness score {launch_summary['readiness_score']} with {launch_summary['control_coverage']} controls passing.",
                         ),
                     ],
                 }
@@ -286,51 +268,33 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         },
         {
             "id": "runtime",
-            "title": "Live Runtime Activity",
-            "description": "Request, policy, deny, and operator-confirmation activity summarized in one pane.",
+            "title": "Recent Activity",
+            "description": "A business-friendly view of recent requests, decisions, alerts, and approvals.",
             "blocks": [
                 {
                     "type": "cards",
-                    "title": "Live posture",
+                    "title": "Activity summary",
                     "items": [
-                        _card("Active sessions", str(len(_unique([str(event.get("request_id", "")) for event in request_events]))), "healthy", "Distinct request sessions observed in the runtime sample."),
-                        _card("Recent requests", str(len(request_events)), "neutral", "New requests entering the governed runtime."),
-                        _card("Recent policy decisions", str(len(policy_events)), "neutral", "Policy checkpoints emitted by the runtime path."),
-                        _card("Recent deny events", str(len(deny_events)), "warning" if deny_events else "healthy", "Explicit deny events raised by governance controls."),
-                        _card("Tool execution attempts", str(len(tool_events)), "neutral", "Observed attempts to invoke tools from agent flows."),
-                        _card("Fallback events", str(len(fallback_events)), "warning" if fallback_events else "healthy", "Fallback or degraded-runtime signals."),
+                        _card("Combined activity", str(activity_snapshot["counts"]["combined"]), "healthy" if activity_snapshot["counts"]["combined"] else "warning", "Recent Onyx and Langfuse items visible to the dashboard."),
+                        _card("Onyx activity", str(activity_snapshot["counts"]["onyx"]), "healthy" if activity_snapshot["counts"]["onyx"] else "warning", "Recent requests and runtime events coming from Onyx."),
+                        _card("Langfuse traces", str(activity_snapshot["counts"]["langfuse_traces"]), "healthy" if activity_snapshot["counts"]["langfuse_traces"] else "warning", "Recent trace items captured by Langfuse."),
+                        _card("Langfuse sessions", str(activity_snapshot["counts"]["langfuse_sessions"]), "neutral", "Recent sessions recorded by Langfuse."),
+                        _card("Recent alerts", str(activity_snapshot["counts"]["alerts"]), "warning" if activity_snapshot["counts"]["alerts"] else "healthy", "Warnings or critical items in the combined activity feed."),
+                        _card("Source coverage", "2 sources", "healthy" if all(status.startswith("connected") for status in activity_snapshot["sources"].values()) else "warning", "The dashboard is reading from both Onyx and Langfuse activity sources."),
                     ],
                 },
                 {
                     "type": "records",
-                    "title": "Recent runtime events",
+                    "title": "Recent activity details",
                     "items": [
                         *[
                             _record(
-                                title=f"Request {event.get('request_id', '')}",
-                                meta=f"{event.get('tenant_id', '')} | {event.get('timestamp', '')}",
-                                detail=f"Path {event.get('payload', {}).get('path', '/runtime')}",
-                                status="neutral",
+                                title=str(entry.get("event_type", "activity")),
+                                meta=f"{entry.get('source_label', '')} | {entry.get('timestamp', '')}",
+                                detail=str(entry.get("summary", "")),
+                                status=str(entry.get("status", "neutral")),
                             )
-                            for event in request_events
-                        ],
-                        *[
-                            _record(
-                                title=f"Deny {event.get('request_id', '')}",
-                                meta=f"{event.get('tenant_id', '')} | {event.get('timestamp', '')}",
-                                detail=str(event.get("payload", {}).get("reason", "denied")),
-                                status="warning",
-                            )
-                            for event in deny_events
-                        ],
-                        *[
-                            _record(
-                                title=f"Confirmation required: {tool_name}",
-                                meta="Tool governance",
-                                detail="High-impact action stays behind explicit user confirmation.",
-                                status="warning",
-                            )
-                            for tool_name in confirmation_required
+                            for entry in activity_snapshot["entries"]
                         ],
                     ],
                 },
@@ -338,12 +302,12 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         },
         {
             "id": "retrieval",
-            "title": "Retrieval Security View",
-            "description": "Tenant boundaries, retrieval decisions, and provenance posture for RAG workflows.",
+            "title": "Data Access",
+            "description": "How company data is segmented, approved, and used by AI workflows.",
             "blocks": [
                 {
                     "type": "cards",
-                    "title": "Retrieval posture",
+                    "title": "Data access summary",
                     "items": [
                         _card("Indexed sources", str(len(retrieval_rows)), "healthy", "Sources currently modeled for tenant-scoped retrieval."),
                         _card("Tenant/source boundaries", str(len(allowed_sources)), "healthy", "Per-tenant source segmentation is declared in policy."),
@@ -381,12 +345,12 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         },
         {
             "id": "tools-mcp",
-            "title": "Tool and MCP Control View",
-            "description": "Registered tools, approval gates, sandbox posture, and MCP inventory.",
+            "title": "Controls and Integrations",
+            "description": "Which tools are allowed, blocked, or require approval before use.",
             "blocks": [
                 {
                     "type": "cards",
-                    "title": "Control counts",
+                    "title": "Control summary",
                     "items": [
                         _card("Registered tools", str(len(registered_tools)), "neutral", "Union of approved and blocked tool inventory."),
                         _card("Approved tools", str(len(policy.get("tools", {}).get("allowed_tools", []))), "healthy", "Tools allowed for governed execution."),
@@ -434,12 +398,12 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         },
         {
             "id": "evals",
-            "title": "AI Traces and Evals",
-            "description": "Trace coverage, red-team readiness, and eval quality posture across models and agents.",
+            "title": "Quality and Safety",
+            "description": "How well the AI system performs in testing, tracing, and safety checks.",
             "blocks": [
                 {
                     "type": "cards",
-                    "title": "Trace and eval summary",
+                    "title": "Quality summary",
                     "items": [
                         _card("Recent traces", str(len(trace_ids)), "neutral", "Unique traces observed in the telemetry sample."),
                         _card("Prompt/response paths", f"{counts.get('request.start', 0)}/{counts.get('request.end', 0)}", "healthy", "Request starts versus completed responses."),
@@ -477,12 +441,12 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         },
         {
             "id": "audit-replay",
-            "title": "Audit and Replay",
-            "description": "Audit trails, trace IDs, replay-ready sessions, and exportable evidence links.",
+            "title": "Audit and Evidence",
+            "description": "Audit trails, traceability, and evidence exports for review and reporting.",
             "blocks": [
                 {
                     "type": "table",
-                    "title": "Recent audit events",
+                    "title": "Recent audit records",
                     "columns": [
                         {"key": "event", "label": "Audit event"},
                         {"key": "trace_id", "label": "Trace ID"},
@@ -529,12 +493,12 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         },
         {
             "id": "launch-gate",
-            "title": "Launch Gate and Readiness",
-            "description": "Coverage, residual risk, failed tests, and release readiness in one place.",
+            "title": "Launch Readiness",
+            "description": "A business view of coverage, risks, failed tests, and go-live readiness.",
             "blocks": [
                 {
                     "type": "cards",
-                    "title": "Readiness scorecard",
+                    "title": "Readiness summary",
                     "items": [
                         _card("Control coverage", launch_summary["control_coverage"], "neutral", "Fully passing controls versus total control checks."),
                         _card("Missing controls", str(len(launch_summary["missing_controls"])), "warning" if launch_summary["missing_controls"] else "healthy", "Controls not fully satisfied in the current readiness report."),
@@ -564,12 +528,12 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
         },
         {
             "id": "entry-points",
-            "title": "Entry Points",
-            "description": "Operator launch points into runtime modules, governance surfaces, and evidence tools.",
+            "title": "Useful Links",
+            "description": "Direct links to the main business, operations, and evidence tools behind this dashboard.",
             "blocks": [
                 {
                     "type": "links",
-                    "title": "Modules",
+                    "title": "Open tools",
                     "items": [
                         {
                             "label": "Open Chat",
@@ -621,20 +585,18 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "title": "Trust & Security Operations Dashboard for RAG and Autonomous Agents",
-        "subtitle": "Dashboard main page -> identity/session -> governed AI runtime -> evidence/analytics",
-        "runtime_module": "Onyx is presented as a governed runtime module behind this control plane.",
+        "title": "AI Trust and Security Business Dashboard",
+        "subtitle": "Business overview -> access -> AI operations -> evidence and reporting",
+        "runtime_module": "Onyx runs behind this dashboard as the managed AI workspace.",
         "tabs": [
             {"id": "overview", "label": "Overview"},
-            {"id": "runtime", "label": "Runtime"},
-            {"id": "retrieval", "label": "Retrieval"},
-            {"id": "tools-mcp", "label": "Tools & MCP"},
-            {"id": "tools-mcp", "label": "Policies"},
-            {"id": "evals", "label": "Evals"},
-            {"id": "audit-replay", "label": "Audit & Replay"},
-            {"id": "launch-gate", "label": "Launch Gate"},
-            {"id": "audit-replay", "label": "Evidence Pack"},
-            {"id": "entry-points", "label": "Chat / Agents"},
+            {"id": "runtime", "label": "Activity"},
+            {"id": "retrieval", "label": "Data Access"},
+            {"id": "tools-mcp", "label": "Controls"},
+            {"id": "evals", "label": "Quality"},
+            {"id": "audit-replay", "label": "Audit"},
+            {"id": "launch-gate", "label": "Readiness"},
+            {"id": "entry-points", "label": "Useful Links"},
         ],
         "sections": sections,
         "sources": [

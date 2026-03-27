@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime, timezone
+import os
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +30,20 @@ def _raw(path: str) -> str:
     return f"/raw/{path}"
 
 
+def _public_service_url(port: int, fallback_path: str = "") -> str:
+    codespace_name = os.environ.get("CODESPACE_NAME", "").strip()
+    forwarding_domain = os.environ.get("GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN", "").strip()
+    if codespace_name and forwarding_domain:
+        base = f"https://{codespace_name}-{port}.{forwarding_domain}"
+    else:
+        base = f"http://localhost:{port}"
+    return f"{base}{fallback_path}"
+
+
+def _dashboard_url(path: str = "") -> str:
+    return _public_service_url(3000, path)
+
+
 def _status_from_launch(verdict: str) -> str:
     return {
         "go": "healthy",
@@ -51,6 +66,71 @@ def _unique(values: list[str]) -> list[str]:
         if value and value not in ordered:
             ordered.append(value)
     return ordered
+
+
+def _severity_status(value: str) -> str:
+    normalized = value.strip().lower()
+    return {
+        "error": "critical",
+        "critical": "critical",
+        "warning": "warning",
+        "warn": "warning",
+        "info": "neutral",
+        "debug": "neutral",
+    }.get(normalized, "neutral")
+
+
+def _summarize_event(event: dict[str, Any]) -> str:
+    event_type = str(event.get("event_type", "event"))
+    payload = event.get("payload", {})
+    if not isinstance(payload, dict):
+        payload = {}
+
+    if event_type == "request.start":
+        return f"Started {payload.get('path', '/runtime')}"
+    if event_type == "request.end":
+        return f"Completed with status {payload.get('status', 'unknown')}"
+    if event_type == "policy.decision":
+        decision = "allow" if payload.get("allow") else "deny"
+        return f"Policy {decision} via {payload.get('policy', 'policy bundle')}"
+    if event_type == "retrieval.decision":
+        return f"{payload.get('decision', 'allow').upper()} retrieval from {payload.get('source', 'unknown source')}"
+    if event_type == "tool.execution_attempt":
+        return f"Attempted tool {payload.get('tool_name', 'unknown')}"
+    if event_type == "fallback.event":
+        return f"Fallback triggered: {payload.get('reason', 'degraded runtime')}"
+    if event_type == "deny.event":
+        return f"Denied by governance: {payload.get('reason', 'policy_denied')}"
+    if event_type == "incident.signal":
+        return f"Incident signal: {payload.get('signal', 'anomaly_detected')}"
+
+    details = [f"{key}={value}" for key, value in payload.items() if value not in {"", None}]
+    return ", ".join(details[:3]) if details else "No payload details recorded."
+
+
+def build_control_plane_live_log(root: Path | None = None, limit: int = 12) -> dict[str, Any]:
+    resolved_root = repo_root(root)
+    events = load_sample_events(resolved_root)
+    recent_events = list(reversed(events[-limit:]))
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "poll_interval_ms": 5000,
+        "source_href": _raw("telemetry/exports/sample_events.jsonl"),
+        "entries": [
+            {
+                "event_type": str(event.get("event_type", "event")),
+                "timestamp": str(event.get("timestamp", "")),
+                "severity": str(event.get("severity", "info")),
+                "status": _severity_status(str(event.get("severity", "info"))),
+                "request_id": str(event.get("request_id", "")),
+                "trace_id": str(event.get("trace_id", "")),
+                "tenant_id": str(event.get("tenant_id", "")),
+                "summary": _summarize_event(event),
+            }
+            for event in recent_events
+        ],
+    }
 
 
 def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
@@ -493,43 +573,43 @@ def build_control_plane_dashboard(root: Path | None = None) -> dict[str, Any]:
                     "items": [
                         {
                             "label": "Open Chat",
-                            "href": "http://localhost:10000",
-                            "description": "Launch governed chat flows through the runtime ingress path when Onyx is enabled behind Envoy.",
-                            "status": "warning",
+                            "href": _public_service_url(3010, "/app"),
+                            "description": "Open the Onyx chat workspace as the governed runtime module behind the control plane.",
+                            "status": "healthy",
                         },
                         {
                             "label": "Open Agents",
-                            "href": "http://localhost:10000",
-                            "description": "Enter agent workflows through the same governed runtime path.",
-                            "status": "warning",
+                            "href": _public_service_url(3010, "/app/agents"),
+                            "description": "Open the Onyx agents workspace behind the dashboard-first control plane.",
+                            "status": "healthy",
                         },
                         {
                             "label": "Search Knowledge",
-                            "href": "http://localhost:6333/dashboard",
-                            "description": "Inspect retrieval backend posture and collections in Qdrant.",
+                            "href": _public_service_url(3010, "/app?chatMode=search"),
+                            "description": "Open the Onyx search experience backed by the governed retrieval stack.",
                             "status": "healthy",
                         },
                         {
                             "label": "Review Policies",
-                            "href": _raw("overlays/myStarterKit/policies/bundles/default/policy.json"),
+                            "href": _dashboard_url("/raw/overlays/myStarterKit/policies/bundles/default/policy.json"),
                             "description": "Review the active runtime policy bundle and integration inventory.",
                             "status": "healthy",
                         },
                         {
                             "label": "Review Evals",
-                            "href": "http://localhost:3002",
+                            "href": _public_service_url(3002),
                             "description": "Open Langfuse for trace and eval drill-down.",
                             "status": "healthy",
                         },
                         {
                             "label": "Review Evidence Pack",
-                            "href": _raw("overlays/myStarterKit/artifacts/evidence/reviewer/reviewer_evidence_bundle.json"),
+                            "href": _dashboard_url("/raw/overlays/myStarterKit/artifacts/evidence/reviewer/reviewer_evidence_bundle.json"),
                             "description": "Open the reviewer evidence bundle exported by myStarterKit.",
                             "status": "healthy",
                         },
                         {
                             "label": "Admin / Tenant Settings",
-                            "href": "http://localhost:8080",
+                            "href": _public_service_url(8080),
                             "description": "Identity and tenant administration entry point via Keycloak.",
                             "status": "healthy",
                         },

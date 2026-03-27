@@ -50,6 +50,7 @@ body::before {
 
 .hero,
 .tab-strip,
+.live-log-panel,
 .dashboard-section,
 .footer {
   position: relative;
@@ -57,6 +58,7 @@ body::before {
 }
 
 .hero,
+.live-log-panel,
 .dashboard-section,
 .footer {
   background: var(--panel);
@@ -138,7 +140,12 @@ h3 {
   margin-top: 18px;
 }
 
+.hero-actions {
+  margin-top: 18px;
+}
+
 .chip,
+.hero-action-button,
 .tab-button,
 .status-pill {
   display: inline-flex;
@@ -153,6 +160,24 @@ h3 {
 .chip {
   background: rgba(255, 255, 255, 0.68);
   border: 1px solid rgba(23, 32, 43, 0.08);
+}
+
+.hero-action-button {
+  border: 1px solid rgba(22, 93, 82, 0.18);
+  background: linear-gradient(135deg, rgba(22, 93, 82, 0.12), rgba(255, 255, 255, 0.92));
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.hero-action-button:hover,
+.hero-action-button:focus-visible {
+  border-color: rgba(22, 93, 82, 0.4);
+  outline: none;
+}
+
+.hero-action-button:disabled {
+  opacity: 0.65;
+  cursor: progress;
 }
 
 .hero-steps {
@@ -194,6 +219,11 @@ h3 {
   margin: 18px 0;
 }
 
+.live-log-panel {
+  padding: 26px;
+  margin-bottom: 18px;
+}
+
 .tab-button {
   background: rgba(255, 255, 255, 0.64);
   border: 1px solid rgba(23, 32, 43, 0.08);
@@ -210,6 +240,89 @@ h3 {
 .dashboard-root {
   display: grid;
   gap: 18px;
+}
+
+.live-log-root {
+  display: grid;
+  gap: 14px;
+}
+
+.live-log-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.live-log-source {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.live-log-source:hover,
+.live-log-source:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+
+.live-log-list {
+  display: grid;
+  gap: 12px;
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.live-log-entry {
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+}
+
+.live-log-entry-head,
+.live-log-title-row,
+.live-log-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.live-log-entry-head {
+  justify-content: space-between;
+}
+
+.live-log-time,
+.live-log-meta-chip {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.live-log-summary {
+  margin: 12px 0 0;
+  line-height: 1.55;
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 0.95rem;
+}
+
+.live-log-meta-row {
+  margin-top: 12px;
+}
+
+.live-log-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(23, 32, 43, 0.05);
+}
+
+.live-log-empty h3,
+.live-log-entry h3 {
+  font-size: 1rem;
 }
 
 .dashboard-section {
@@ -366,12 +479,14 @@ tr:last-child td {
   }
 
   .hero,
+  .live-log-panel,
   .dashboard-section,
   .footer {
     border-radius: 22px;
   }
 
   .hero,
+  .live-log-panel,
   .dashboard-section {
     padding: 20px;
   }

@@ -15,10 +15,32 @@
           The dashboard is the front door. Identity, runtime governance, telemetry, and evidence drill-down modules sit behind it.
         </p>
         <div class="hero-meta" id="hero-meta"></div>
+        <div class="hero-actions">
+          <button class="hero-action-button" id="reset-dashboard-button" type="button">
+            Reset dashboard
+          </button>
+        </div>
         <div class="hero-steps" id="hero-steps"></div>
       </header>
 
       <nav class="tab-strip" id="tab-strip" aria-label="Dashboard tabs"></nav>
+
+      <section class="live-log-panel" aria-labelledby="live-log-title">
+        <div class="section-head">
+          <p class="eyebrow">Live telemetry</p>
+          <h2 id="live-log-title">Operator Activity Log</h2>
+          <p class="section-description">
+            Auto-refreshing runtime and governance events from the control-plane telemetry feed.
+          </p>
+        </div>
+        <div id="live-log-root" class="live-log-root">
+          <section class="loading-panel">
+            <p class="eyebrow">Loading</p>
+            <h3>Connecting to live event feed</h3>
+            <p>Waiting for the latest runtime, policy, and deny events.</p>
+          </section>
+        </div>
+      </section>
 
       <main id="dashboard-root" class="dashboard-root" aria-live="polite">
         <section class="loading-panel">

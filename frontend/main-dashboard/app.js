@@ -3,6 +3,13 @@ const tabStrip = document.getElementById("tab-strip");
 const heroMeta = document.getElementById("hero-meta");
 const heroSteps = document.getElementById("hero-steps");
 const sourcesRoot = document.getElementById("sources");
+const liveLogRoot = document.getElementById("live-log-root");
+const resetDashboardButton = document.getElementById("reset-dashboard-button");
+
+const LIVE_LOG_LIMIT = 12;
+const DEFAULT_LIVE_LOG_POLL_MS = 5000;
+let liveLogTimer = 0;
+let lastDashboardPayload = null;
 
 const LANDING_STEPS = [
   "Dashboard main page",
@@ -24,6 +31,19 @@ function statusClass(status) {
   return `status-pill status-${status || "neutral"}`;
 }
 
+function formatTimestamp(value) {
+  if (!value) {
+    return "Timestamp unavailable";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.valueOf())) {
+    return value;
+  }
+
+  return parsed.toLocaleString();
+}
+
 function renderHero(payload) {
   heroMeta.innerHTML = `
     <span class="chip">${escapeHtml(payload.runtime_module)}</span>
@@ -38,6 +58,82 @@ function renderHero(payload) {
       </article>
     `,
   ).join("");
+}
+
+function renderResetState() {
+  heroMeta.innerHTML = "";
+  heroSteps.innerHTML = "";
+
+  const linkSections = Array.isArray(lastDashboardPayload?.sections)
+    ? lastDashboardPayload.sections
+        .map((section) => {
+          const linkBlocks = Array.isArray(section.blocks)
+            ? section.blocks.filter((block) => block.type === "links")
+            : [];
+          return linkBlocks.length ? { ...section, blocks: linkBlocks } : null;
+        })
+        .filter(Boolean)
+    : [];
+
+  const resetTabs = linkSections.map((section) => ({
+    id: section.id,
+    label: section.title,
+  }));
+
+  if (resetTabs.length) {
+    renderTabs(resetTabs);
+  } else {
+    tabStrip.innerHTML = "";
+  }
+
+  if (Array.isArray(lastDashboardPayload?.sources)) {
+    renderSources(lastDashboardPayload.sources);
+  } else {
+    sourcesRoot.innerHTML = "";
+  }
+
+  if (liveLogRoot) {
+    liveLogRoot.innerHTML = `
+      <section class="loading-panel">
+        <p class="eyebrow">Reset</p>
+        <h3>Live log cleared</h3>
+        <p>No telemetry entries are currently shown.</p>
+      </section>
+    `;
+  }
+
+  if (linkSections.length) {
+    root.innerHTML = `
+      <section class="loading-panel">
+        <p class="eyebrow">Reset</p>
+        <h2>Dashboard data cleared</h2>
+        <p>Operational stats were removed, but URL entry points and source links remain available below.</p>
+      </section>
+      ${linkSections
+        .map(
+          (section) => `
+            <section class="dashboard-section" id="${escapeHtml(section.id)}">
+              <div class="section-head">
+                <p class="eyebrow">${escapeHtml(section.id)}</p>
+                <h2>${escapeHtml(section.title)}</h2>
+                <p class="section-description">${escapeHtml(section.description)}</p>
+              </div>
+              ${renderBlocks(section.blocks)}
+            </section>
+          `,
+        )
+        .join("")}
+    `;
+    return;
+  }
+
+  root.innerHTML = `
+    <section class="loading-panel">
+      <p class="eyebrow">Reset</p>
+      <h2>Dashboard cleared</h2>
+      <p>All rendered control-plane data has been removed from the page.</p>
+    </section>
+  `;
 }
 
 function renderTabs(tabs) {
@@ -196,14 +292,117 @@ function renderSources(sources) {
     .join("");
 }
 
+function renderLiveLog(payload) {
+  if (!liveLogRoot) {
+    return;
+  }
+
+  const entries = Array.isArray(payload.entries) ? payload.entries : [];
+  const refreshedAt = formatTimestamp(payload.generated_at);
+  const intervalSeconds = Math.max(1, Math.round((payload.poll_interval_ms || DEFAULT_LIVE_LOG_POLL_MS) / 1000));
+
+  liveLogRoot.innerHTML = `
+    <div class="live-log-toolbar">
+      <div class="hero-meta">
+        <span class="chip">Auto-refresh ${intervalSeconds}s</span>
+        <span class="chip">Last updated ${escapeHtml(refreshedAt)}</span>
+        <span class="chip">${escapeHtml(String(entries.length))} events</span>
+      </div>
+      <a class="live-log-source" href="${escapeHtml(payload.source_href || "/raw/telemetry/exports/sample_events.jsonl")}" target="_blank" rel="noreferrer">
+        Open raw feed
+      </a>
+    </div>
+    <div class="live-log-list">
+      ${
+        entries.length
+          ? entries
+              .map(
+                (entry) => `
+                  <article class="live-log-entry">
+                    <div class="live-log-entry-head">
+                      <div class="live-log-title-row">
+                        <span class="${statusClass(entry.status)}">${escapeHtml(entry.severity || "info")}</span>
+                        <h3>${escapeHtml(entry.event_type || "event")}</h3>
+                      </div>
+                      <time class="live-log-time">${escapeHtml(formatTimestamp(entry.timestamp))}</time>
+                    </div>
+                    <p class="live-log-summary">${escapeHtml(entry.summary || "No event summary available.")}</p>
+                    <div class="live-log-meta-row">
+                      ${
+                        entry.request_id
+                          ? `<span class="live-log-meta-chip">request ${escapeHtml(entry.request_id)}</span>`
+                          : ""
+                      }
+                      ${
+                        entry.trace_id
+                          ? `<span class="live-log-meta-chip">trace ${escapeHtml(entry.trace_id)}</span>`
+                          : ""
+                      }
+                      ${
+                        entry.tenant_id
+                          ? `<span class="live-log-meta-chip">tenant ${escapeHtml(entry.tenant_id)}</span>`
+                          : ""
+                      }
+                    </div>
+                  </article>
+                `,
+              )
+              .join("")
+          : `
+            <article class="live-log-entry live-log-empty">
+              <h3>No events yet</h3>
+              <p class="live-log-summary">Telemetry entries will appear here as the local event feed grows.</p>
+            </article>
+          `
+      }
+    </div>
+  `;
+}
+
+function renderLiveLogError(error) {
+  if (!liveLogRoot) {
+    return;
+  }
+
+  liveLogRoot.innerHTML = `
+    <section class="loading-panel">
+      <p class="eyebrow">Unavailable</p>
+      <h3>Live log could not load</h3>
+      <p>${escapeHtml(error.message || "Unknown error")}</p>
+    </section>
+  `;
+}
+
+function scheduleLiveLogRefresh(intervalMs) {
+  window.clearTimeout(liveLogTimer);
+  liveLogTimer = window.setTimeout(loadLiveLog, intervalMs);
+}
+
+async function loadLiveLog() {
+  try {
+    const response = await fetch(`/api/control-plane/live-log?limit=${LIVE_LOG_LIMIT}`, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Live log API returned ${response.status}`);
+    }
+
+    const payload = await response.json();
+    renderLiveLog(payload);
+    scheduleLiveLogRefresh(payload.poll_interval_ms || DEFAULT_LIVE_LOG_POLL_MS);
+  } catch (error) {
+    renderLiveLogError(error);
+    scheduleLiveLogRefresh(DEFAULT_LIVE_LOG_POLL_MS);
+  }
+}
+
 async function boot() {
   try {
-    const response = await fetch("/api/control-plane/overview");
+    const response = await fetch("/api/control-plane/overview", { cache: "no-store" });
     if (!response.ok) {
       throw new Error(`Dashboard API returned ${response.status}`);
     }
 
     const payload = await response.json();
+    lastDashboardPayload = payload;
     renderHero(payload);
     renderTabs(payload.tabs);
     renderSections(payload.sections);
@@ -219,4 +418,27 @@ async function boot() {
   }
 }
 
+async function resetDashboard() {
+  if (resetDashboardButton) {
+    resetDashboardButton.disabled = true;
+    resetDashboardButton.textContent = "Resetting...";
+  }
+
+  window.clearTimeout(liveLogTimer);
+  renderResetState();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  if (resetDashboardButton) {
+    resetDashboardButton.disabled = false;
+    resetDashboardButton.textContent = "Reset dashboard";
+  }
+}
+
+if (resetDashboardButton) {
+  resetDashboardButton.addEventListener("click", () => {
+    resetDashboard();
+  });
+}
+
 boot();
+loadLiveLog();

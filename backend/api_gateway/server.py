@@ -6,9 +6,9 @@ import os
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
-from backend.posture_service.service import build_control_plane_dashboard
+from backend.posture_service.service import build_control_plane_dashboard, build_control_plane_live_log
 
 
 REPO_ROOT = Path(os.environ.get("CONTROL_PLANE_REPO_ROOT", Path(__file__).resolve().parents[2])).resolve()
@@ -30,6 +30,11 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
             self._send_json(build_control_plane_dashboard(REPO_ROOT))
             return
 
+        if path == "/api/control-plane/live-log":
+            limit = self._parse_int_query(parse_qs(parsed.query).get("limit", ["12"])[0], default=12, minimum=1, maximum=50)
+            self._send_json(build_control_plane_live_log(REPO_ROOT, limit=limit))
+            return
+
         if path.startswith("/raw/"):
             self._serve_repo_file(path.removeprefix("/raw/"))
             return
@@ -46,6 +51,13 @@ class ControlPlaneRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
         self.wfile.write(encoded)
+
+    def _parse_int_query(self, raw_value: str, default: int, minimum: int, maximum: int) -> int:
+        try:
+            parsed = int(raw_value)
+        except ValueError:
+            return default
+        return max(minimum, min(maximum, parsed))
 
     def _serve_static(self, request_path: str) -> None:
         relative_path = "index.html" if request_path in {"", "/"} else request_path.lstrip("/")

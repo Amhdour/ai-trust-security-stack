@@ -48,19 +48,20 @@ To also remove named volumes:
 docker compose --env-file compose/.env -f compose/docker-compose.yml down -v
 ```
 
-## Service endpoints (default local ports)
-- Control plane dashboard: `http://localhost:3000`
-- Keycloak: `http://localhost:8080`
-- Envoy: `http://localhost:10000`
-- OPA: `http://localhost:8181`
-- Vault: `http://localhost:8200`
-- Qdrant: `http://localhost:6333`
-- Langfuse: `http://localhost:3002`
-- Grafana: `http://localhost:3001`
-- Superset: `http://localhost:8088`
+## Service endpoints (Codespaces preview URLs)
+- Control plane dashboard: `https://orange-space-journey-7vrrp4wqq4r6h7p9-3000.app.github.dev`
+- Keycloak: `https://orange-space-journey-7vrrp4wqq4r6h7p9-8080.app.github.dev`
+- Envoy: `https://orange-space-journey-7vrrp4wqq4r6h7p9-10000.app.github.dev`
+- OPA: `https://orange-space-journey-7vrrp4wqq4r6h7p9-8181.app.github.dev`
+- Vault: `https://orange-space-journey-7vrrp4wqq4r6h7p9-8200.app.github.dev`
+- Qdrant: `https://orange-space-journey-7vrrp4wqq4r6h7p9-6333.app.github.dev`
+- Langfuse: `https://orange-space-journey-7vrrp4wqq4r6h7p9-3002.app.github.dev`
+- Grafana: `https://orange-space-journey-7vrrp4wqq4r6h7p9-3001.app.github.dev`
+- Superset: `https://orange-space-journey-7vrrp4wqq4r6h7p9-8088.app.github.dev`
 
 ## Notes
 - The dashboard is the main landing page and aggregates posture from repo-owned artifacts plus supporting services.
+- In another Codespace, replace `orange-space-journey-7vrrp4wqq4r6h7p9` with that Codespace name and keep the same port suffix.
 - Secrets are provided via environment variables and placeholders only.
 - `vault` is configured in `-dev` mode for local development.
 - Langfuse uses the local `db` PostgreSQL service by default.
